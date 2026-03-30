@@ -1,0 +1,24 @@
+Se pencher sur le côté évolution des kpi's, voir avec l'edb et dashboard niv 1 c'est les mm kpi's
+dans le code on a figer la date, il faut prendre la date apres le 2 eme "_" du nom du fichier et se caler a chaque fois dernier jour du mois
+recuperer les fichiers que le client a envoyé on en a certains en 2025 2026, ce n'est pas dispo dans concaténation.
+
+Recrutement actuel (date du fichier DSN) -- Vs Recrutement N-1 
+
+Faire l'evolution pour tout les champs (N-1) et (M-1) dans le dash (meme ceux de Pierre)
+
+
+A faire demain : 
+
+Ajout de kpi's : 
+
+voir l'edb complexe dans page vue accueil ce que j'ia mis en orange a vérifier si on a pas et rajouter dans le df
+
+Mettre le fait qu'on s'en fou de la regle de 3 salarié minimum
+on s'en fou de la regles individus identifiable on les compte en agregat
+
+vue 11 a faire entierement sur streamlit
+vue 12 avec les seuil a faire dans streamlit également
+
+lexique envoyé par le client fichier "dsn-datatypes-CT2025" page fields voir avec gemini les regles de calcul. 
+
+voir l'edb complexe tout info de chaque pages excel  est dispo dans l'edb "EDB_Dashboard_Complet_vFxlsx"

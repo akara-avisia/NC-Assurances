@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>leZèbre · Analyse DSN — Boulangerie Martin SARL</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,300;0,400;0,600;0,700;0,800;1,400&family=Barlow+Condensed:wght@600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy:      #0d1b4b;
+  --navy-mid:  #132260;
+  --navy-deep: #091238;
+  --mag:       #e8176e;
+  --mag-light: #fde8f1;
+  --mag-mid:   rgba(232,23,110,.18);
+  --mag-glow:  rgba(232,23,110,.35);
+  --white:     #ffffff;
+  --off:       #f0f2f8;
+  --off2:      #e4e8f4;
+  --dim:       rgba(255,255,255,.45);
+  --dim2:      rgba(255,255,255,.22);
+  --dim3:      rgba(255,255,255,.10);
+  --vert:      #00c48c;
+  --vert-lt:   rgba(0,196,140,.12);
+  --amber:     #ffb020;
+  --amber-lt:  rgba(255,176,32,.12);
+  --rouge:     #ff4757;
+  --rouge-lt:  rgba(255,71,87,.12);
+  --bleu-cl:   #4a9eff;
+  --bleu-lt:   rgba(74,158,255,.12);
+  --border-d:  rgba(255,255,255,.08);
+  --border-l:  rgba(13,27,75,.10);
+  --sans:  'Barlow', sans-serif;
+  --cond:  'Barlow Condensed', sans-serif;
+  --mono:  'DM Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--off);
+  font-family: var(--sans);
+  color: var(--navy);
+  font-size: 13.5px;
+  line-height: 1.55;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ── PRINT BTN ── */
+.print-btn {
+  position: fixed; bottom: 28px; right: 28px;
+  background: var(--mag); color: #fff; border: none;
+  border-radius: 50px; padding: 12px 26px;
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  letter-spacing: .07em; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 4px 24px var(--mag-glow);
+  transition: transform .2s, box-shadow .2s; z-index: 999;
+}
+.print-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 32px var(--mag-glow); }
+@media print { .print-btn { display: none; } }
+
+/* ── PAGE ── */
+.page { max-width: 980px; margin: 0 auto; }
+
+/* ── COVER ── */
+.cover {
+  background: linear-gradient(135deg, var(--navy-deep) 0%, var(--navy) 50%, var(--navy-mid) 100%);
+  padding: 52px 56px 44px;
+  position: relative; overflow: hidden;
+}
+.cover::before {
+  content: '';
+  position: absolute; top: -80px; right: -80px;
+  width: 400px; height: 400px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(232,23,110,.22) 0%, transparent 70%);
+}
+.cover::after {
+  content: '';
+  position: absolute; bottom: -60px; left: 30%;
+  width: 300px; height: 300px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(74,158,255,.10) 0%, transparent 70%);
+}
+
+.cover-top {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; margin-bottom: 44px;
+}
+
+.logo {
+  display: flex; align-items: center; gap: 10px;
+}
+.logo-icon { width: 36px; height: 36px; }
+.logo-text {
+  font-family: var(--sans); font-size: 28px; font-weight: 800;
+  color: var(--white); letter-spacing: -.5px;
+}
+.logo-text span { color: var(--mag); }
+
+.doc-meta {
+  font-family: var(--mono); font-size: 10px;
+  color: var(--dim); text-align: right; line-height: 1.9;
+}
+
+.cover-pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--mag-mid); border: 1px solid var(--mag-glow);
+  border-radius: 50px; padding: 5px 14px;
+  font-family: var(--mono); font-size: 9.5px; font-weight: 500;
+  color: var(--mag); letter-spacing: .1em; text-transform: uppercase;
+  margin-bottom: 22px;
+}
+.cover-pill::before {
+  content: ''; width: 6px; height: 6px;
+  background: var(--mag); border-radius: 50%;
+  animation: blink 1.6s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+.cover-title {
+  font-family: var(--cond); font-size: 52px; font-weight: 800;
+  color: var(--white); line-height: 1.05;
+  letter-spacing: -.5px; margin-bottom: 14px; max-width: 600px;
+}
+.cover-title em { color: var(--mag); font-style: normal; }
+
+.cover-sub {
+  font-size: 14.5px; font-weight: 300;
+  color: var(--dim); max-width: 500px; line-height: 1.7;
+  margin-bottom: 36px;
+}
+
+.cover-chips {
+  display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 36px;
+}
+.chip {
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--dim3); border: 1px solid var(--border-d);
+  border-radius: 8px; padding: 10px 16px;
+}
+.chip-l { font-family: var(--mono); font-size: 8.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim2); }
+.chip-v { font-size: 13px; font-weight: 600; color: var(--white); }
+
+.cover-hr { height: 1px; background: var(--border-d); margin: 0 0 24px; }
+
+.cover-rgpd {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 11px; color: var(--dim2); line-height: 1.65;
+}
+.cover-rgpd .ri { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+
+/* ── BODY ── */
+.body { padding: 36px 56px; background: var(--off); }
+
+/* ── INTRO BAND ── */
+.intro {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+  border-radius: 12px; padding: 22px 26px;
+  display: flex; gap: 16px; align-items: flex-start;
+  margin-bottom: 36px; position: relative; overflow: hidden;
+}
+.intro::after {
+  content: ''; position: absolute; right: -40px; top: -40px;
+  width: 180px; height: 180px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(232,23,110,.15) 0%, transparent 70%);
+}
+.intro .ri { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+.intro-title {
+  font-family: var(--cond); font-size: 18px; font-weight: 700;
+  color: var(--white); margin-bottom: 5px;
+}
+.intro-text { font-size: 12.5px; color: var(--dim); line-height: 1.7; font-weight: 300; }
+
+/* ── SECTION LABEL ── */
+.slbl {
+  font-family: var(--mono); font-size: 9.5px; font-weight: 500;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: rgba(13,27,75,.45); margin-bottom: 14px;
+  display: flex; align-items: center; gap: 10px;
+}
+.slbl::before { content: ''; width: 3px; height: 14px; background: var(--mag); border-radius: 2px; flex-shrink: 0; }
+.slbl::after  { content: ''; flex: 1; height: 1px; background: var(--border-l); }
+
+/* ── KPI CARDS ── */
+.kpi-grid { display: grid; gap: 12px; margin-bottom: 14px; }
+.kpi-grid.g5 { grid-template-columns: repeat(5,1fr); }
+
+.kc {
+  background: var(--white);
+  border: 1px solid var(--border-l);
+  border-radius: 12px; padding: 18px 16px 14px;
+  position: relative; overflow: hidden;
+  animation: fadeup .5s ease both;
+}
+.kc::before {
+  content: ''; position: absolute;
+  top: 0; left: 0; right: 0; height: 3px; border-radius: 12px 12px 0 0;
+}
+.kc.m::before  { background: var(--mag); }
+.kc.n::before  { background: var(--navy); }
+.kc.g::before  { background: var(--vert); }
+.kc.a::before  { background: var(--amber); }
+.kc.r::before  { background: var(--rouge); }
+.kc.b::before  { background: var(--bleu-cl); }
+
+.kc:nth-child(1){animation-delay:.05s}
+.kc:nth-child(2){animation-delay:.10s}
+.kc:nth-child(3){animation-delay:.15s}
+.kc:nth-child(4){animation-delay:.20s}
+.kc:nth-child(5){animation-delay:.25s}
+
+@keyframes fadeup {
+  from{opacity:0;transform:translateY(8px)}
+  to  {opacity:1;transform:translateY(0)}
+}
+
+.alert-dot {
+  position: absolute; top: 12px; right: 12px;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--rouge);
+  animation: blink 1.6s ease-in-out infinite;
+}
+
+.kc-lbl {
+  font-family: var(--mono); font-size: 8.5px; letter-spacing: .08em;
+  text-transform: uppercase; color: rgba(13,27,75,.45); margin-bottom: 7px;
+}
+.kc-val {
+  font-family: var(--cond); font-size: 30px; font-weight: 800;
+  line-height: 1; margin-bottom: 4px; color: var(--navy);
+}
+.kc-val.alert { color: var(--rouge); }
+.kc-val.warn  { color: var(--amber); }
+.kc-sub {
+  font-family: var(--mono); font-size: 8.5px;
+  color: rgba(13,27,75,.4); margin-bottom: 7px;
+}
+.kc-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-family: var(--mono); font-size: 9px; font-weight: 500;
+  padding: 2px 7px; border-radius: 4px;
+}
+.kc-badge.up   { background: var(--vert-lt);  color: var(--vert); }
+.kc-badge.down { background: var(--rouge-lt); color: var(--rouge); }
+.kc-badge.flat { background: var(--off2);     color: rgba(13,27,75,.5); }
+.kc-badge.warn { background: var(--amber-lt); color: var(--amber); }
+
+.kc-bench {
+  margin-top: 6px; font-family: var(--mono); font-size: 8.5px;
+  color: rgba(13,27,75,.35); border-top: 1px solid var(--border-l); padding-top: 5px;
+}
+.kc-tag {
+  display: inline-block; margin-top: 5px;
+  font-family: var(--mono); font-size: 8px; font-weight: 600;
+  padding: 2px 6px; border-radius: 3px;
+  background: var(--rouge-lt); color: var(--rouge);
+}
+.kc-tag.warn { background: var(--amber-lt); color: var(--amber); }
+
+/* ── PANEL ── */
+.panel {
+  background: var(--white); border: 1px solid var(--border-l);
+  border-radius: 12px; padding: 22px;
+}
+.panel-head {
+  display: flex; align-items: center;
+  justify-content: space-between; margin-bottom: 18px;
+}
+.panel-title {
+  font-family: var(--cond); font-size: 17px; font-weight: 700;
+  color: var(--navy); letter-spacing: -.2px;
+}
+.pbadge {
+  font-family: var(--mono); font-size: 8.5px; letter-spacing: .07em;
+  background: var(--mag-mid); border: 1px solid var(--mag-glow);
+  color: var(--mag); padding: 3px 9px; border-radius: 50px;
+  text-transform: uppercase;
+}
+
+/* ── TABLEAU RÉPARTITION ── */
+.pop-table { width: 100%; border-collapse: collapse; }
+.pop-table th {
+  font-family: var(--mono); font-size: 8.5px; letter-spacing: .1em;
+  text-transform: uppercase; color: rgba(13,27,75,.45);
+  padding: 0 10px 10px; border-bottom: 2px solid var(--mag);
+}
+.pop-table th:first-child { text-align: left; }
+.pop-table th:not(:first-child) { text-align: center; }
+.pop-table td { padding: 12px 10px; border-bottom: 1px solid var(--off2); vertical-align: middle; }
+.pop-table td:first-child { text-align: left; }
+.pop-table td:not(:first-child) { text-align: center; }
+.pop-table tr:last-child td { border-bottom: none; }
+
+.pop-row-total { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%) !important; }
+.pop-row-total td { border-bottom: none !important; }
+
+.pop-name { display: flex; align-items: center; gap: 8px; }
+.pop-dot  { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+.mini-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.mini-bar-bg { width: 56px; height: 5px; background: var(--off2); border-radius: 99px; overflow: hidden; }
+.mini-bar-fill { height: 100%; border-radius: 99px; }
+
+.pop-badge {
+  font-family: var(--mono); font-size: 9.5px; font-weight: 600;
+  padding: 3px 9px; border-radius: 4px;
+}
+.pop-big {
+  font-family: var(--cond); font-size: 22px; font-weight: 800;
+}
+.pop-sal {
+  font-family: var(--cond); font-size: 18px; font-weight: 700;
+}
+.pop-sub { font-family: var(--mono); font-size: 8px; color: rgba(13,27,75,.4); }
+
+/* ── HISTOGRAMME ── */
+.histo-wrap {
+  display: flex; gap: 0; position: relative;
+}
+.axe-y {
+  display: flex; flex-direction: column-reverse; justify-content: space-between;
+  align-items: flex-end; padding-right: 10px; padding-bottom: 28px;
+  flex-shrink: 0; width: 68px;
+}
+.histo-zone-wrap { flex: 1; display: flex; flex-direction: column; }
+.histo-zone {
+  position: relative; height: 200px;
+  border-left: 2px solid var(--off2); border-bottom: 2px solid var(--off2);
+}
+.histo-bars {
+  position: absolute; inset: 0;
+  display: flex; align-items: flex-end; justify-content: space-around;
+  padding: 0 60px; gap: 24px;
+}
+.axe-x { display: flex; justify-content: space-around; padding: 8px 60px 0; gap: 24px; }
+
+/* ── COUVERTURES ── */
+.couv-list { display: flex; flex-direction: column; gap: 12px; }
+.couv-row  { display: flex; align-items: center; gap: 10px; }
+.couv-lbl  { font-size: 12px; font-weight: 600; width: 110px; flex-shrink: 0; color: var(--navy); }
+.couv-bg   { flex: 1; background: var(--off2); border-radius: 99px; height: 8px; overflow: hidden; }
+.couv-fill { height: 100%; border-radius: 99px; transition: width 1s ease; }
+.couv-pct  { font-family: var(--mono); font-size: 10px; font-weight: 600; width: 36px; text-align: right; }
+.couv-tag  {
+  font-family: var(--mono); font-size: 8px; font-weight: 600;
+  padding: 2px 7px; border-radius: 3px; white-space: nowrap; width: 70px; text-align: center;
+}
+.couv-tag.ok   { background: var(--vert-lt);  color: var(--vert); }
+.couv-tag.warn { background: var(--amber-lt); color: var(--amber); }
+.couv-tag.info { background: var(--bleu-lt);  color: var(--bleu-cl); }
+.couv-tag.no   { background: var(--off2); color: rgba(13,27,75,.4); }
+
+/* ── ANOMALIES ── */
+.anom-head {
+  display: flex; align-items: center; gap: 10px;
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+  border-radius: 12px 12px 0 0; padding: 14px 20px;
+}
+.anom-dot { width: 8px; height: 8px; background: var(--mag); border-radius: 50%; flex-shrink: 0; animation: blink 1.2s ease-in-out infinite; }
+.anom-head strong { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; color: var(--white); }
+.anom-cards { background: var(--white); border: 1px solid var(--border-l); border-top: none; border-radius: 0 0 12px 12px; overflow: hidden; }
+.ac {
+  display: flex; gap: 14px; padding: 16px 20px;
+  border-bottom: 1px solid var(--off2); font-size: 12.5px; line-height: 1.55;
+}
+.ac:last-child { border-bottom: none; }
+.ac.cr { border-left: 4px solid var(--rouge); }
+.ac.wa { border-left: 4px solid var(--amber); }
+.ac .sev {
+  font-family: var(--mono); font-size: 8px; font-weight: 700;
+  padding: 3px 6px; border-radius: 3px; height: fit-content; flex-shrink: 0; margin-top: 3px;
+}
+.ac .sev.cr { background: var(--rouge); color: #fff; }
+.ac .sev.wa { background: var(--amber); color: #fff; }
+.ac-title { font-weight: 700; margin-bottom: 3px; color: var(--navy); }
+.ac-detail { font-size: 11.5px; color: rgba(13,27,75,.55); font-weight: 300; }
+
+/* ── LOCKED PREVIEW ── */
+.locked-wrap { position: relative; margin-bottom: 28px; }
+.locked-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom, rgba(240,242,248,.1) 0%, rgba(240,242,248,.96) 52%);
+  border-radius: 12px; display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end; padding-bottom: 28px; z-index: 10;
+}
+.lock-pill {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+  color: var(--white); font-family: var(--mono); font-size: 10px; letter-spacing: .09em;
+  padding: 9px 22px; border-radius: 50px; display: flex; align-items: center; gap: 7px;
+  box-shadow: 0 4px 20px rgba(13,27,75,.2);
+}
+.locked-grid {
+  display: grid; grid-template-columns: repeat(4,1fr); gap: 10px;
+  filter: blur(2.5px); pointer-events: none; user-select: none;
+}
+.lkc {
+  background: var(--white); border: 1px solid var(--border-l);
+  border-radius: 12px; padding: 16px; height: 100px;
+}
+.lb  { height: 9px;  background: var(--off2); border-radius: 4px; margin-bottom: 8px; }
+.lv  { height: 26px; background: var(--off);  border-radius: 4px; margin-bottom: 8px; }
+.ls  { height: 7px;  background: var(--off2); border-radius: 4px; width: 60%; }
+
+/* ── UNLOCK BAND ── */
+.unlock {
+  background: linear-gradient(135deg, var(--navy-deep) 0%, var(--navy) 50%, var(--navy-mid) 100%);
+  border-radius: 14px; padding: 34px 40px;
+  display: flex; align-items: center; gap: 36px;
+  position: relative; overflow: hidden; margin-bottom: 32px;
+}
+.unlock::before {
+  content: ''; position: absolute; top: -60px; right: -60px;
+  width: 240px; height: 240px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(232,23,110,.2) 0%, transparent 70%);
+}
+.unlock-l { flex: 1; }
+.unlock-eyebrow {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--mag); margin-bottom: 8px;
+}
+.unlock-title {
+  font-family: var(--cond); font-size: 28px; font-weight: 800;
+  color: var(--white); line-height: 1.2; margin-bottom: 10px; letter-spacing: -.3px;
+}
+.unlock-title em { color: var(--mag); font-style: normal; }
+.unlock-txt { font-size: 13px; font-weight: 300; color: var(--dim); line-height: 1.7; }
+.unlock-feats { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+.uf { display: flex; align-items: center; gap: 9px; font-size: 12.5px; font-weight: 300; color: var(--dim); }
+.uf::before { content: '→'; color: var(--mag); font-family: var(--mono); font-size: 10px; flex-shrink: 0; }
+
+.unlock-r { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.cta-btn {
+  background: var(--mag); color: var(--white); border: none;
+  border-radius: 10px; padding: 16px 32px;
+  font-family: var(--sans); font-size: 13px; font-weight: 700;
+  cursor: pointer; white-space: nowrap; letter-spacing: .02em;
+  box-shadow: 0 4px 24px var(--mag-glow);
+  transition: transform .2s, box-shadow .2s;
+}
+.cta-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 32px var(--mag-glow); }
+.cta-sub { font-family: var(--mono); font-size: 9px; color: var(--dim2); text-align: center; }
+
+/* ── FOOTER ── */
+.foot {
+  background: linear-gradient(135deg, var(--navy-deep) 0%, var(--navy) 100%);
+  padding: 26px 56px; display: flex; align-items: center;
+  justify-content: space-between; flex-wrap: wrap; gap: 10px;
+}
+.foot-l { font-family: var(--mono); font-size: 9.5px; color: var(--dim2); line-height: 1.8; }
+.foot-r { display: flex; gap: 16px; flex-wrap: wrap; font-family: var(--mono); font-size: 9.5px; color: var(--dim2); }
+
+@media print {
+  body { background: white; }
+  .page { max-width: 100%; }
+  .cover, .unlock, .foot { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .kc { break-inside: avoid; }
+  @page { margin: 0; size: A4; }
+}
+</style>
+</head>
+<body>
+
+<button class="print-btn" onclick="window.print()">🖨 Exporter PDF</button>
+
+<div class="page">
+
+<!-- ══ COVER ══ -->
+<div class="cover">
+  <div class="cover-top">
+    <div class="logo">
+      <!-- Icône flamme LeZebre SVG inline -->
+      <svg class="logo-icon" viewBox="0 0 40 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 42C12 42 5 34 8 24C10 17 16 15 14 8C14 8 22 14 19 24C17 30 12 30 14 38" fill="none" stroke="#e8176e" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M22 38C22 38 17 30 20 22C22 16 27 15 26 8C26 8 33 14 31 23C29 29 24 29 25 36" fill="none" stroke="#e8176e" stroke-width="2.5" stroke-linecap="round" opacity=".75"/>
+        <circle cx="32" cy="30" r="4" fill="#e8176e" opacity=".9"/>
+      </svg>
+      <div class="logo-text">le<span>Z</span>èbre</div>
+    </div>
+    <div class="doc-meta">
+      Analyse DSN · Niveau 1<br>
+      Émis le 11 mars 2026<br>
+      Réf. LZ-2026-0311-001<br>
+      CONFIDENTIEL
+    </div>
+  </div>
+
+  <div class="cover-pill">Restitution prospect · Analyse DSN automatique</div>
+
+  <div class="cover-title">
+    Ce que votre DSN<br>nous a <em>révélé</em>.
+  </div>
+
+  <div class="cover-sub">
+    Analyse automatique de votre Déclaration Sociale Nominative. Les indicateurs ci-dessous sont extraits directement de vos données de paie — sans saisie manuelle, sans questionnaire.
+  </div>
+
+  <div class="cover-chips">
+    <div class="chip"><span class="chip-l">Entreprise</span><span class="chip-v">Boulangerie Martin SARL</span></div>
+    <div class="chip"><span class="chip-l">Période DSN</span><span class="chip-v">Mars 2026</span></div>
+    <div class="chip"><span class="chip-l">Norme</span><span class="chip-v">Phase 3 · GIP-MDS 2025</span></div>
+    <div class="chip"><span class="chip-l">Analysé par</span><span class="chip-v">leZèbre · Moteur IA DSN</span></div>
+  </div>
+
+  <div class="cover-hr"></div>
+
+  <div class="cover-rgpd">
+    <span class="ri">🛡</span>
+    <span>Données agrégées — aucune donnée nominative exposée dans ce document. Traitement conforme RGPD Art. 5, 25 et 32. Pseudonymisation SHA-256 active. Ce rapport ne contient aucun nom, NIR ou salaire individuel.</span>
+  </div>
+</div>
+
+<!-- ══ BODY ══ -->
+<div class="body">
+
+  <!-- Intro -->
+  <div class="intro">
+    <span class="ri">🔍</span>
+    <div>
+      <div class="intro-title">Voici ce que nous avons trouvé dans votre DSN de mars 2026</div>
+      <div class="intro-text">Ce rapport de niveau 1 vous restitue 12 indicateurs clés extraits automatiquement de votre fichier DSN. Il couvre vos effectifs, votre masse salariale, vos couvertures prévoyance et santé, et les premiers signaux de risque RH. L'analyse complète (90+ KPI, benchmarks sectoriels, alertes détaillées, suivi 12 mois) est disponible dans la version Entreprise.</div>
+    </div>
+  </div>
+
+  <!-- ── INDICATEURS CLÉS 1 ── -->
+  <div class="slbl">Indicateurs clés 1 — Effectifs &amp; Cotisations</div>
+  <div class="kpi-grid g5" style="margin-bottom:14px;">
+
+    <div class="kc n">
+      <div class="kc-lbl">Effectif total</div>
+      <div class="kc-val">34</div>
+      <div class="kc-sub">salariés déclarés DSN</div>
+      <div class="kc-badge flat">→ stable</div>
+      <div class="kc-bench">Variation N-1 : +2 sal.</div>
+    </div>
+
+    <div class="kc m">
+      <div class="kc-lbl">Masse salariale brute</div>
+      <div class="kc-val">87k€</div>
+      <div class="kc-sub">mensuel · mars 2026</div>
+      <div class="kc-badge up">↑ +2,3% vs N-1</div>
+      <div class="kc-bench">Variation M-1 : +2,0%</div>
+    </div>
+
+    <div class="kc g">
+      <div class="kc-lbl">Cotisation santé</div>
+      <div class="kc-val">4 820€</div>
+      <div class="kc-sub">part employeur + salariale</div>
+      <div class="kc-badge up">↑ +1,8% vs N-1</div>
+      <div class="kc-bench">Variation M-1 : +0,9%</div>
+    </div>
+
+    <div class="kc a">
+      <div class="alert-dot"></div>
+      <div class="kc-lbl">Cotisation prévoyance</div>
+      <div class="kc-val warn">3 240€</div>
+      <div class="kc-sub">part employeur + salariale</div>
+      <div class="kc-badge warn">⚠ Partiel</div>
+      <div class="kc-bench">5 salariés non-affiliés</div>
+      <div class="kc-tag warn">Point d'attention</div>
+    </div>
+
+    <div class="kc b">
+      <div class="kc-lbl">Cotisation retraite</div>
+      <div class="kc-val">5 610€</div>
+      <div class="kc-sub">part employeur + salariale</div>
+      <div class="kc-badge up">↑ +1,2% vs N-1</div>
+      <div class="kc-bench">Variation M-1 : stable</div>
+    </div>
+
+  </div>
+
+  <!-- ── INDICATEURS CLÉS 2 ── -->
+  <div class="slbl" style="margin-top:22px;">Indicateurs clés 2 — RH &amp; Performance</div>
+  <div class="kpi-grid g5" style="margin-bottom:32px;">
+
+    <div class="kc n">
+      <div class="kc-lbl">Ancienneté moy. CDI</div>
+      <div class="kc-val">6,8</div>
+      <div class="kc-sub">années · CDI uniquement</div>
+      <div class="kc-badge up">↑ +0,4 ans vs N-1</div>
+      <div class="kc-bench">Médiane CDI : 5,2 ans</div>
+    </div>
+
+    <div class="kc r">
+      <div class="alert-dot"></div>
+      <div class="kc-lbl">Absentéisme</div>
+      <div class="kc-val alert">5,9%</div>
+      <div class="kc-sub">taux · mars 2026</div>
+      <div class="kc-badge down">↑ +1,8 pts vs N-1</div>
+      <div class="kc-bench">Seuil secteur : 3,8%</div>
+      <div class="kc-tag">Point d'attention</div>
+    </div>
+
+    <div class="kc m">
+      <div class="kc-lbl">Salaire moyen total</div>
+      <div class="kc-val">2 559€</div>
+      <div class="kc-sub">brut · cadres &amp; non-cadres</div>
+      <div class="kc-badge up">↑ +1,4% vs N-1</div>
+      <div class="kc-bench">Cadres / Non-cadres : cf. tableau</div>
+    </div>
+
+    <div class="kc g">
+      <div class="kc-lbl">Recrutement 12 mois</div>
+      <div class="kc-val">4</div>
+      <div class="kc-sub">embauches · M-11 à M</div>
+      <div class="kc-badge flat">Variation M-1 : +1</div>
+      <div class="kc-bench">Délai moy. : 23 jours</div>
+    </div>
+
+    <div class="kc a">
+      <div class="alert-dot"></div>
+      <div class="kc-lbl">Turn-over</div>
+      <div class="kc-val warn">18,2%</div>
+      <div class="kc-sub">(départs+entrées)/2 / effectif</div>
+      <div class="kc-badge down">↑ +4,1 pts vs N-1</div>
+      <div class="kc-bench">Seuil secteur : 12%</div>
+      <div class="kc-tag warn">Point d'attention</div>
+    </div>
+
+  </div>
+
+  <!-- ── RÉPARTITION + HISTOGRAMME ── -->
+  <div class="slbl">Répartition des effectifs &amp; évolution masse salariale</div>
+
+  <!-- Tableau cadres / non-cadres -->
+  <div class="panel" style="margin-bottom:16px;">
+    <div class="panel-head">
+      <div class="panel-title">Répartition par population</div>
+      <div class="pbadge">34 salariés · mars 2026</div>
+    </div>
+    <table class="pop-table">
+      <thead>
+        <tr>
+          <th style="text-align:left;">Population</th>
+          <th>Nombre</th>
+          <th>Taux</th>
+          <th style="text-align:right;padding-right:10px;">Masse salariale</th>
+          <th>Part</th>
+          <th style="text-align:right;padding-right:10px;">Salaire moyen</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Cadres -->
+        <tr>
+          <td>
+            <div class="pop-name">
+              <div class="pop-dot" style="background:#1e3a8a;"></div>
+              <div>
+                <div style="font-weight:700;font-size:13px;color:var(--navy);">Cadres</div>
+                <div style="font-family:var(--mono);font-size:8px;color:rgba(13,27,75,.38);">Statut 05 · S21.G00.40</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="pop-big" style="color:#1e3a8a;">8</span></td>
+          <td>
+            <div class="mini-bar-wrap">
+              <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:#1e3a8a;">23,5%</span>
+              <div class="mini-bar-bg"><div class="mini-bar-fill" style="width:23.5%;background:#1e3a8a;"></div></div>
+            </div>
+          </td>
+          <td style="text-align:right;padding-right:10px;">
+            <span style="font-family:var(--mono);font-size:12px;font-weight:600;">28 400 €</span>
+            <div class="pop-sub">mensuel brut</div>
+          </td>
+          <td>
+            <span class="pop-badge" style="background:var(--bleu-lt);color:var(--bleu-cl);">32,6%</span>
+          </td>
+          <td style="text-align:right;padding-right:10px;">
+            <span class="pop-sal" style="color:#1e3a8a;">3 550 €</span>
+            <div class="pop-sub">brut / mois</div>
+          </td>
+        </tr>
+        <!-- Non-cadres -->
+        <tr style="background:var(--off);">
+          <td>
+            <div class="pop-name">
+              <div class="pop-dot" style="background:var(--mag);"></div>
+              <div>
+                <div style="font-weight:700;font-size:13px;color:var(--navy);">Non-cadres</div>
+                <div style="font-family:var(--mono);font-size:8px;color:rgba(13,27,75,.38);">Statut 04 · S21.G00.40</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="pop-big" style="color:var(--mag);">26</span></td>
+          <td>
+            <div class="mini-bar-wrap">
+              <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--mag);">76,5%</span>
+              <div class="mini-bar-bg"><div class="mini-bar-fill" style="width:76.5%;background:var(--mag);"></div></div>
+            </div>
+          </td>
+          <td style="text-align:right;padding-right:10px;">
+            <span style="font-family:var(--mono);font-size:12px;font-weight:600;">58 600 €</span>
+            <div class="pop-sub">mensuel brut</div>
+          </td>
+          <td>
+            <span class="pop-badge" style="background:var(--mag-mid);color:var(--mag);">67,4%</span>
+          </td>
+          <td style="text-align:right;padding-right:10px;">
+            <span class="pop-sal" style="color:var(--mag);">2 254 €</span>
+            <div class="pop-sub">brut / mois</div>
+          </td>
+        </tr>
+        <!-- Total -->
+        <tr class="pop-row-total">
+          <td style="border-radius:0 0 0 10px;">
+            <span style="font-weight:700;font-size:13px;color:var(--white);">Total entreprise</span>
+          </td>
+          <td><span class="pop-big" style="color:var(--mag);">34</span></td>
+          <td><span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--dim);">100%</span></td>
+          <td style="text-align:right;padding-right:10px;">
+            <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--white);">87 000 €</span>
+            <div style="font-family:var(--mono);font-size:8px;color:var(--dim2);">mensuel brut</div>
+          </td>
+          <td><span class="pop-badge" style="background:var(--mag-mid);color:var(--mag);">100%</span></td>
+          <td style="text-align:right;padding-right:10px;border-radius:0 0 10px 0;">
+            <span class="pop-sal" style="color:var(--mag);">2 559 €</span>
+            <div style="font-family:var(--mono);font-size:8px;color:var(--dim2);">brut / mois</div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top:10px;font-family:var(--mono);font-size:8.5px;color:rgba(13,27,75,.38);">🔒 Données agrégées — aucun salaire individuel exposé · Source : S21.G00.40 + S21.G00.51</div>
+  </div>
+
+  <!-- Histogramme évolution MS -->
+  <div class="panel" style="margin-bottom:28px;">
+    <div class="panel-head">
+      <div class="panel-title">Évolution de la masse salariale totale</div>
+      <div class="pbadge">3 dernières années · annualisé</div>
+    </div>
+    <div style="display:flex;gap:16px;margin-bottom:18px;">
+      <span style="display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;color:rgba(13,27,75,.5);">
+        <span style="width:12px;height:12px;border-radius:2px;background:#1e3a8a;display:inline-block;"></span>Cadres
+      </span>
+      <span style="display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;color:rgba(13,27,75,.5);">
+        <span style="width:12px;height:12px;border-radius:2px;background:var(--mag);display:inline-block;"></span>Non-cadres
+      </span>
+    </div>
+    <div class="histo-wrap">
+      <div class="axe-y" id="axeY"></div>
+      <div class="histo-zone-wrap">
+        <div class="histo-zone">
+          <div id="gridLines" style="position:absolute;inset:0;pointer-events:none;"></div>
+          <div class="histo-bars" id="histoBars"></div>
+        </div>
+        <div class="axe-x" id="axeX"></div>
+      </div>
+    </div>
+    <div style="margin-top:10px;font-family:var(--mono);font-size:8.5px;color:rgba(13,27,75,.38);">Source : S21.G00.51 · Montants annualisés · Données agrégées RGPD</div>
+  </div>
+
+  <!-- ── COUVERTURES ── -->
+  <div class="slbl">Couvertures prévoyance &amp; santé — analyse de conformité</div>
+
+  <div class="panel" style="margin-bottom:28px;">
+    <div class="panel-head">
+      <div class="panel-title">État des couvertures détecté en DSN</div>
+      <div class="pbadge">Blocs S21.G00.81</div>
+    </div>
+    <div class="couv-list">
+      <div class="couv-row">
+        <div class="couv-lbl">Mutuelle santé</div>
+        <div class="couv-bg"><div class="couv-fill" style="width:100%;background:var(--vert);"></div></div>
+        <div class="couv-pct" style="color:var(--vert);">100%</div>
+        <div class="couv-tag ok">✓ Conforme</div>
+      </div>
+      <div class="couv-row">
+        <div class="couv-lbl">Prévoyance</div>
+        <div class="couv-bg"><div class="couv-fill" style="width:85%;background:var(--amber);"></div></div>
+        <div class="couv-pct" style="color:var(--amber);">85%</div>
+        <div class="couv-tag warn">⚠ Partiel</div>
+      </div>
+      <div class="couv-row">
+        <div class="couv-lbl">Prév. cadres</div>
+        <div class="couv-bg"><div class="couv-fill" style="width:100%;background:var(--vert);"></div></div>
+        <div class="couv-pct" style="color:var(--vert);">100%</div>
+        <div class="couv-tag ok">✓ Conforme</div>
+      </div>
+      <div class="couv-row">
+        <div class="couv-lbl">Retraite supp.</div>
+        <div class="couv-bg"><div class="couv-fill" style="width:60%;background:var(--bleu-cl);"></div></div>
+        <div class="couv-pct" style="color:var(--bleu-cl);">60%</div>
+        <div class="couv-tag info">ℹ Optionnel</div>
+      </div>
+      <div class="couv-row">
+        <div class="couv-lbl">Dépendance</div>
+        <div class="couv-bg"><div class="couv-fill" style="width:0%;background:#ccc;"></div></div>
+        <div class="couv-pct" style="color:#aaa;">0%</div>
+        <div class="couv-tag no">Non souscrit</div>
+      </div>
+    </div>
+    <div style="margin-top:16px;padding:12px 16px;background:var(--amber-lt);border-left:4px solid var(--amber);border-radius:8px;font-size:12.5px;color:var(--navy);">
+      <strong style="color:var(--amber);">⚠ Point d'attention :</strong> 5 salariés ne sont pas affiliés à la prévoyance collective. Selon votre convention collective, cette couverture peut être obligatoire — risque de redressement URSSAF.
+    </div>
+  </div>
+
+  <!-- ── ANOMALIES ── -->
+  <div class="slbl">Signaux détectés — points d'attention</div>
+
+  <div style="margin-bottom:32px;">
+    <div class="anom-head">
+      <div class="anom-dot"></div>
+      <strong>3 SIGNAUX DÉTECTÉS DANS VOTRE DSN</strong>
+      <span style="font-family:var(--mono);font-size:9px;color:var(--dim2);margin-left:auto;">Analyse automatique leZèbre</span>
+    </div>
+    <div class="anom-cards">
+      <div class="ac cr">
+        <span class="sev cr">URGENT</span>
+        <div>
+          <div class="ac-title">Prévoyance incomplète — 5 salariés non-couverts</div>
+          <div class="ac-detail">Détecté via les codes cotisation DSN (S21.G00.81). 85% de l'effectif est affilié, 15% ne l'est pas. Selon la CCN applicable, cette couverture peut être obligatoire pour l'ensemble des salariés. Risque de redressement URSSAF estimé à plusieurs milliers d'euros.</div>
+        </div>
+      </div>
+      <div class="ac wa">
+        <span class="sev wa">ATTENTION</span>
+        <div>
+          <div class="ac-title">Absentéisme 5,9% — au-dessus de la médiane secteur (3,8%)</div>
+          <div class="ac-detail">Le taux d'absentéisme calculé sur mars 2026 dépasse de +2,1 points la médiane du secteur boulangerie-pâtisserie. Le coût estimé est de l'ordre de 5 130€ ce mois-ci. Un contrat prévoyance avec maintien de salaire dès J1 réduirait l'exposition financière.</div>
+        </div>
+      </div>
+      <div class="ac wa">
+        <span class="sev wa">ATTENTION</span>
+        <div>
+          <div class="ac-title">Turn-over 18,2% — seuil sectoriel dépassé</div>
+          <div class="ac-detail">Le taux calculé sur 12 mois glissants est de 18,2%, contre 12% en médiane secteur. Chaque départ représente un coût estimé de 3 000 à 8 000€. Un dispositif de fidélisation (prévoyance, épargne salariale) peut agir sur cet indicateur.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── LOCKED PREVIEW ── -->
+  <div class="slbl">Aperçu — Tableau de bord complet (version Entreprise)</div>
+  <div class="locked-wrap">
+    <div class="locked-overlay">
+      <div class="lock-pill">🔒 Accès réservé clients leZèbre — 87 indicateurs supplémentaires</div>
+    </div>
+    <div class="locked-grid">
+      <div class="lkc"><div class="lb" style="width:70%"></div><div class="lv"></div><div class="ls"></div></div>
+      <div class="lkc"><div class="lb" style="width:50%"></div><div class="lv"></div><div class="ls"></div></div>
+      <div class="lkc"><div class="lb" style="width:85%"></div><div class="lv"></div><div class="ls"></div></div>
+      <div class="lkc"><div class="lb" style="width:60%"></div><div class="lv"></div><div class="ls"></div></div>
+      <div class="lkc"><div class="lb" style="width:40%"></div><div class="lv"></div><div class="ls"></div></div>
+      <div class="lkc"><div class="lb" style="width:75%"></div><div class="lv"></div><div class="ls"></div></div>
+      <div class="lkc"><div class="lb" style="width:90%"></div><div class="lv"></div><div class="ls"></div></div>
+      <div class="lkc"><div class="lb" style="width:55%"></div><div class="lv"></div><div class="ls"></div></div>
+    </div>
+  </div>
+
+  <!-- ── UNLOCK BAND ── -->
+  <div class="unlock">
+    <div class="unlock-l">
+      <div class="unlock-eyebrow">Passez à la version Entreprise</div>
+      <div class="unlock-title">Débloquez l'analyse<br><em>complète</em> de votre DSN</div>
+      <div class="unlock-txt">Ce rapport vous montre 12 indicateurs. La version Entreprise en couvre 90+, mis à jour chaque mois automatiquement.</div>
+      <div class="unlock-feats">
+        <div class="uf">90+ KPI RH · benchmarks sectoriels en temps réel</div>
+        <div class="uf">Alertes automatiques dès anomalie détectée</div>
+        <div class="uf">Deux vues : Chef d'entreprise &amp; Expert-comptable</div>
+        <div class="uf">Historique 24 mois · export PDF mensuel automatique</div>
+        <div class="uf">Propositions de couverture optimisées sur vos données réelles</div>
+      </div>
+    </div>
+    <div class="unlock-r">
+      <button class="cta-btn">Demander une démo →</button>
+      <div class="cta-sub">contact@lezebre.fr · 01 XX XX XX XX</div>
+    </div>
+  </div>
+
+</div><!-- /body -->
+
+<!-- ── FOOTER ── -->
+<div class="foot">
+  <div class="foot-l">leZèbre · Analyse DSN Niveau 1 · Réf. LZ-2026-0311-001 · Mars 2026<br>Données agrégées — RGPD Art. 5, 25, 32 · Pseudonymisation SHA-256 · dpo@lezebre.fr</div>
+  <div class="foot-r">
+    <span>🔒 RGPD conforme</span>
+    <span>📋 Norme DSN Phase 3</span>
+    <span>⚙ Moteur IA leZèbre</span>
+  </div>
+</div>
+
+</div><!-- /page -->
+
+<script>
+// ── HISTOGRAMME ÉVOL MS — CADRES / NON-CADRES ──
+const msData = [
+  { year: '2024', cadres: 340000, nc: 704000, total: 1044000 },
+  { year: '2025', cadres: 365000, nc: 757000, total: 1122000 },
+  { year: '2026',  cadres: 340800, nc: 703200, total: 1044000 },
+];
+const CHART_H = 200, MAX_VAL = 1300000;
+const STEPS = [0, 250000, 500000, 750000, 1000000, 1250000];
+const fmt = v => v >= 1000000
+  ? (v/1000000).toFixed(2).replace('.',',') + '\u00a0M\u20ac'
+  : Math.round(v/1000) + '\u00a0k\u20ac';
+
+// Axe Y
+const axeY = document.getElementById('axeY');
+[...STEPS].reverse().forEach(s => {
+  const d = document.createElement('div');
+  d.style.cssText = 'font-family:"DM Mono",monospace;font-size:9px;color:rgba(13,27,75,.38);white-space:nowrap;line-height:1;';
+  d.textContent = fmt(s);
+  axeY.appendChild(d);
+});
+
+// Grille
+const grid = document.getElementById('gridLines');
+STEPS.forEach(s => {
+  if (!s) return;
+  const pct = (s / MAX_VAL) * 100;
+  const l = document.createElement('div');
+  l.style.cssText = `position:absolute;left:0;right:0;bottom:${pct}%;height:1px;background:rgba(13,27,75,.07);`;
+  grid.appendChild(l);
+});
+
+// Barres
+const barsZ = document.getElementById('histoBars');
+const axeX  = document.getElementById('axeX');
+
+msData.forEach(d => {
+  const hC = (d.cadres / MAX_VAL) * CHART_H;
+  const hN = (d.nc     / MAX_VAL) * CHART_H;
+
+  const grp = document.createElement('div');
+  grp.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;';
+
+  const valLbl = document.createElement('div');
+  valLbl.style.cssText = 'font-family:"DM Mono",monospace;font-size:9px;font-weight:600;color:rgba(13,27,75,.5);margin-bottom:5px;text-align:center;white-space:nowrap;';
+  valLbl.textContent = fmt(d.total);
+
+  const stack = document.createElement('div');
+  stack.style.cssText = 'width:100%;max-width:80px;display:flex;flex-direction:column;cursor:default;transition:opacity .15s;';
+  stack.title = `${d.year}\nTotal : ${d.total.toLocaleString('fr-FR')} €\nCadres : ${d.cadres.toLocaleString('fr-FR')} €\nNon-cadres : ${d.nc.toLocaleString('fr-FR')} €`;
+  stack.onmouseenter = () => { stack.style.opacity = '.75'; valLbl.style.color = '#e8176e'; };
+  stack.onmouseleave = () => { stack.style.opacity = '1';   valLbl.style.color = 'rgba(13,27,75,.5)'; };
+
+  const bC = document.createElement('div');
+  bC.style.cssText = `height:${hC}px;background:#1e3a8a;border-radius:5px 5px 0 0;`;
+
+  const bN = document.createElement('div');
+  bN.style.cssText = `height:${hN}px;background:#e8176e;`;
+
+  stack.append(bC, bN);
+  grp.append(valLbl, stack);
+  barsZ.appendChild(grp);
+
+  const xl = document.createElement('div');
+  xl.style.cssText = 'flex:1;text-align:center;font-family:"DM Mono",monospace;font-size:11px;font-weight:600;color:var(--navy);padding-top:7px;';
+  xl.textContent = d.year;
+  axeX.appendChild(xl);
+});
+</script>
+</body>
+</html>

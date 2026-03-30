@@ -1,0 +1,98 @@
+-- =======================================================
+-- 1. TABLES DE RÉFÉRENCES (Statiques)
+-- =======================================================
+CREATE TABLE ref_activite (
+    id_activite SERIAL PRIMARY KEY,
+    code_naf VARCHAR(6) UNIQUE,
+    libelle_naf VARCHAR(255),
+    code_idcc VARCHAR(4)
+);
+
+CREATE TABLE ref_assureur (
+    id_assureur SERIAL PRIMARY KEY,
+    code_assureur VARCHAR(20) UNIQUE,
+    nom_assureur VARCHAR(100)
+);
+
+-- =======================================================
+-- 2. LA DONNÉE ENTREPRISE (La Dimension)
+-- =======================================================
+CREATE TABLE dim_entreprise (
+    siret VARCHAR(14) PRIMARY KEY,
+    nom_entreprise VARCHAR(255),
+    code_naf VARCHAR(6),
+    adresse_entreprise TEXT,
+    cp_entreprise VARCHAR(5),
+    ville_entreprise VARCHAR(100),
+    date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =======================================================
+-- 3. LA TABLE DE FAITS (Indicateurs historisés du Streamlit)
+-- =======================================================
+CREATE TABLE fait_indicateurs_mensuels (
+    id_fait SERIAL PRIMARY KEY,
+    siret VARCHAR(14) REFERENCES dim_entreprise(siret),
+    date_analyse DATE NOT NULL,
+    
+    -- Indicateurs RH Volumes
+    nombre_contrats_actifs INT,
+    anciennete_moyenne_cdi_annees NUMERIC(5, 2),
+    taux_absenteisme_pourcent NUMERIC(5, 2),
+    recrutements_12_mois INT,
+    taux_turnover_pourcent NUMERIC(5, 2),
+    
+    -- Indicateurs Financiers (K€ et €)
+    masse_salariale_brute_ke INT,
+    salaire_moyen_total INT,
+    
+    -- Répartition Statutaire
+    nombre_cadres INT,
+    taux_cadre_pourcent NUMERIC(5, 2),
+    ms_cadre_ke INT,
+    nombre_non_cadres INT,
+    taux_non_cadre_pourcent NUMERIC(5, 2),
+    ms_non_cadre_ke INT,
+    
+    -- Cotisations (Assurance)
+    total_sante_euros INT,
+    total_prevoyance_euros INT,
+    total_retraite_euros INT,
+    
+    -- Évolutions (Sélection d'exemples clés)
+    evol_effectif_m_1_abs INT,
+    evol_msb_m_1_pourcent NUMERIC(5, 2),
+    evol_turnover_n_1_pts NUMERIC(5, 2),
+    
+    -- Sécurité : une seule photo par mois par entreprise
+    UNIQUE (siret, date_analyse) 
+);
+
+-- =======================================================
+-- 4. LE TARIFICATEUR (Moteur de calcul futur)
+-- =======================================================
+CREATE TABLE tarificateur_grilles (
+    id_grille SERIAL PRIMARY KEY,
+    nom_partenaire VARCHAR(50), 
+    code_idcc VARCHAR(4),
+    statut_vise VARCHAR(10),
+    age_min INT,
+    age_max INT,
+    taux_prevoyance NUMERIC(6, 4),
+    forfait_sante NUMERIC(10, 2),
+    date_debut TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    date_fin TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+-- =======================================================
+-- 5. HISTORIQUE DES RÉSULTATS (Les prix proposés)
+-- =======================================================
+CREATE TABLE fact_historique_prix (
+    id_historique SERIAL PRIMARY KEY,
+    siret VARCHAR(14) REFERENCES dim_entreprise(siret),
+    nom_partenaire VARCHAR(50),
+    type_produit VARCHAR(50), 
+    prime_calculee NUMERIC(10, 2),
+    date_recherche TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

@@ -1,0 +1,53 @@
+========================================================================
+ LEXIQUE DSN - PROJET NC ASSURANCES (Correspondance des segments)
+========================================================================
+
+✅ 1. SEGMENTS CONSERVÉS ET TRADUITS (La "Liste Blanche" Métier)
+Ces segments sont les seuls extraits par notre script Python pour la tarification.
+
+[ENTREPRISE & ÉTABLISSEMENT]
+S21.G00.06.001 -> SIREN (Identifiant unique de l'entreprise)
+S21.G00.06.003 -> CODE_NAF (Activité principale, clé pour déduire la CCN)
+S21.G00.06.004 -> ADRESSE_ENTREPRISE (Numéro et voie)
+S21.G00.06.005 -> CP_ENTREPRISE (Code postal)
+S21.G00.06.006 -> VILLE_ENTREPRISE (Ville)
+S21.G00.11.001 -> NIC (Identifiant de l'établissement, SIREN + NIC = SIRET)
+
+[ASSURANCE & CONTRATS EN COURS]
+S21.G00.15.001 -> REFERENCE_CONTRAT_ACTUEL (Numéro du contrat de prévoyance/santé)
+S21.G00.15.002 -> CODE_ASSUREUR_ACTUEL (Code délégataire, ex: ASWI01=SwissLife, P0914=ProBTP)
+
+[SALARIÉS : DÉMOGRAPHIE ET RÉMUNÉRATION]
+S21.G00.40.006 -> EMPLOI_LIBELLE (Intitulé du poste, ex: "Président", "Peintre")
+S21.G00.40.011 -> STATUT_CONVENTIONNEL (Sert à déduire le collège Cadre / Non-Cadre)
+S21.G00.51.013 -> REMUNERATION_BRUTE (Sert de base au calcul des garanties Prévoyance)
+S21.G00.30.006 -> AGE_SALARIE (Transformé dynamiquement par le script à partir de la Date de Naissance)
+
+------------------------------------------------------------------------
+🚫 2. SEGMENTS REJETÉS (Anonymisation RGPD & Sécurité)
+Ces segments sont volontairement détruits par le script.
+
+[IDENTITÉ DIRECTE DU SALARIÉ]
+S21.G00.30.001 -> Numéro de Sécurité Sociale (NIR)
+S21.G00.30.002 -> Nom de famille
+S21.G00.30.004 -> Prénom(s)
+
+[COORDONNÉES PERSONNELLES DU SALARIÉ]
+S21.G00.30.008 -> Adresse du salarié
+S21.G00.30.009 -> Code postal du salarié
+S21.G00.30.010 -> Ville du salarié
+
+[DONNÉES BANCAIRES]
+S21.G00.20.004 -> IBAN de l'entreprise ou de l'employé
+
+[CONTACTS RH & TIERS DÉCLARANTS]
+S10.G00.02.xxx -> Infos du Tiers Déclarant (Cabinet comptable, email, tel)
+S20.G00.07.xxx -> Infos du contact RH dans l'entreprise
+
+------------------------------------------------------------------------
+🗑️ 3. LE "BRUIT" TECHNIQUE (Ignoré par défaut)
+La DSN contient des milliers de lignes de cotisations pures que nous ignorons.
+S21.G00.20.xxx -> Versements URSSAF, Retraite, DGFIP (Impôts)
+S21.G00.23.xxx -> Cotisations agrégées
+S21.G00.81.xxx -> Cotisations individuelles détaillées
+========================================================================
