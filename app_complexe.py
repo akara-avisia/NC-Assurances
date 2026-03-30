@@ -171,7 +171,9 @@ if fichiers and date_cible:
                     d_12m = d_c - relativedelta(months=12)
                     c_s = df_c[df_c['SIRET'] == siret_principal]
                     s_s = df_s[(df_s['SIRET'] == siret_principal) & (df_s['ANNEE_MOIS'] == d_c)]
+                    s_s_m12 = df_s[(df_s['SIRET'] == siret_principal) & (df_s['ANNEE_MOIS'] == d_12m)]
                     
+                    # Turnover & Effectif
                     rec = len(c_s[(c_s['debut'] > d_12m) & (c_s['debut'] <= d_c)])
                     sorties = len(c_s[c_s['fin'].notna() & (c_s['fin'] > d_12m) & (c_s['fin'] <= d_c)])
                     act_deb = len(c_s[(c_s['debut'] <= d_12m) & ((c_s['fin'].isna()) | (c_s['fin'] > d_12m))])
@@ -179,6 +181,7 @@ if fichiers and date_cible:
                     eff_moy = (act_deb + act_fin) / 2
                     to = round((((rec + sorties) / 2) / eff_moy) * 100, 1) if eff_moy > 0 else 0.0
                     
+                    # Âge
                     actifs = c_s[(c_s['debut'] <= d_c) & ((c_s['fin'].isna()) | (c_s['fin'] > d_c))].copy()
                     if not actifs.empty and 'date_naissance' in actifs.columns:
                         actifs['AGE'] = (d_c - pd.to_datetime(actifs['date_naissance'])).dt.days / 365.25
@@ -187,17 +190,53 @@ if fichiers and date_cible:
                     else:
                         ages_counts = {'NB_MOINS_26': 0, 'NB_26_35': 0, 'NB_36_45': 0, 'NB_46_55': 0, 'NB_PLUS_55': 0}
 
+                    # Salaires globaux
                     sal_h = s_s[s_s['SEXE'] == '1']['MONTANT_BRUT'].mean()
                     sal_f = s_s[s_s['SEXE'] == '2']['MONTANT_BRUT'].mean()
                     sal_h = 0 if pd.isna(sal_h) else sal_h
                     sal_f = 0 if pd.isna(sal_f) else sal_f
                     ecart_hf = round(((sal_h - sal_f) / sal_h) * 100, 1) if sal_h > 0 else 0.0
 
+                    # Salaires croisés H/F et Statut
+                    sal_c_h = s_s[(s_s['STATUT'] == '01') & (s_s['SEXE'] == '1')]['MONTANT_BRUT'].mean()
+                    sal_c_f = s_s[(s_s['STATUT'] == '01') & (s_s['SEXE'] == '2')]['MONTANT_BRUT'].mean()
+                    sal_nc_h = s_s[(s_s['STATUT'] == '04') & (s_s['SEXE'] == '1')]['MONTANT_BRUT'].mean()
+                    sal_nc_f = s_s[(s_s['STATUT'] == '04') & (s_s['SEXE'] == '2')]['MONTANT_BRUT'].mean()
+                    
+                    sal_c_h = 0 if pd.isna(sal_c_h) else int(round(sal_c_h))
+                    sal_c_f = 0 if pd.isna(sal_c_f) else int(round(sal_c_f))
+                    sal_nc_h = 0 if pd.isna(sal_nc_h) else int(round(sal_nc_h))
+                    sal_nc_f = 0 if pd.isna(sal_nc_f) else int(round(sal_nc_f))
+                    
+                    ecart_c_hf = round(((sal_c_h - sal_c_f) / sal_c_h) * 100, 1) if sal_c_h > 0 else 0.0
+                    ecart_nc_hf = round(((sal_nc_h - sal_nc_f) / sal_nc_h) * 100, 1) if sal_nc_h > 0 else 0.0
+
+                    # Ecart d'augmentations (si la DSN le permet)
+                    tx_augm_h, tx_augm_f, ecart_augm_pts = 0.0, 0.0, 0.0
+                    if not s_s.empty and not s_s_m12.empty and 'NIR' in s_s.columns:
+                        s_s_g = s_s.groupby(['NIR', 'SEXE'])['MONTANT_BRUT'].sum().reset_index()
+                        s_s_m12_g = s_s_m12.groupby(['NIR', 'SEXE'])['MONTANT_BRUT'].sum().reset_index()
+                        merged_s = s_s_g.merge(s_s_m12_g, on=['NIR', 'SEXE'], suffixes=('_N', '_N1'))
+                        if not merged_s.empty:
+                            merged_s['AUGMENTE'] = merged_s['MONTANT_BRUT_N'] > (merged_s['MONTANT_BRUT_N1'] * 1.01)
+                            h_augm_rate = merged_s[merged_s['SEXE'] == '1']['AUGMENTE'].mean() * 100
+                            f_augm_rate = merged_s[merged_s['SEXE'] == '2']['AUGMENTE'].mean() * 100
+                            tx_augm_h = 0.0 if pd.isna(h_augm_rate) else round(h_augm_rate, 1)
+                            tx_augm_f = 0.0 if pd.isna(f_augm_rate) else round(f_augm_rate, 1)
+                            ecart_augm_pts = round(tx_augm_h - tx_augm_f, 1)
+
                     comp = {
                         'SIRET': siret_principal, 'DATE_ANALYSE': d_c,
                         'TAUX_TURNOVER_POURCENT': to, 'RECRUTEMENTS_12_MOIS': rec,
                         'DEMISSIONS': row.get('DEMISSIONS', 0), 'EFFECTIF_MOYEN': eff_moy,
-                        'ECART_SALARIAL_HF_POURCENT': ecart_hf
+                        'ECART_SALARIAL_HF_POURCENT': ecart_hf,
+                        'SALAIRE_MOYEN_CADRE_HOMME': sal_c_h,
+                        'SALAIRE_MOYEN_CADRE_FEMME': sal_c_f,
+                        'ECART_SALARIAL_CADRES_HF_POURCENT': ecart_c_hf,
+                        'SALAIRE_MOYEN_NON_CADRE_HOMME': sal_nc_h,
+                        'SALAIRE_MOYEN_NON_CADRE_FEMME': sal_nc_f,
+                        'ECART_SALARIAL_NON_CADRES_HF_POURCENT': ecart_nc_hf,
+                        'ECART_AUGMENTATION_HF_PTS': ecart_augm_pts,
                     }
                     comp.update(ages_counts)
 
@@ -210,11 +249,15 @@ if fichiers and date_cible:
                     kpis_complexes.append(comp)
 
                 df_fait = pd.merge(df_base, pd.DataFrame(kpis_complexes).fillna(0), on=['SIRET', 'DATE_ANALYSE'])
+                
+                # Management F
+                df_fait['TAUX_FEMINISATION_MANAGEMENT_POURCENT'] = np.round(np.where(df_fait['NB_CADRES'] > 0, (df_fait['NB_FEMMES_CADRES'] / df_fait['NB_CADRES']) * 100, 0), 1)
 
                 mets = ['NOMBRE_CONTRATS_ACTIFS', 'MASSE_SALARIALE_BRUTE_KE', 'SALAIRE_MOYEN_TOTAL',
                         'TAUX_ABSENTEISME_POURCENT', 'TAUX_TURNOVER_POURCENT', 'ANCIENNETE_MOYENNE_CDI_ANNEES',
                         'TAUX_FEMINISATION_POURCENT', 'CHARGES_PAT_KE', 'TAUX_AFFILIES_SANTE_POURCENT', 'TAUX_AFFILIES_PREV_POURCENT',
-                        'NB_CDI', 'NB_CDD', 'NB_ALTERNANTS', 'NB_STAGIAIRES', 'NB_TEMPS_PLEIN', 'NB_TEMPS_PARTIEL', 'NB_CADRES', 'NB_NON_CADRES']
+                        'NB_CDI', 'NB_CDD', 'NB_ALTERNANTS', 'NB_STAGIAIRES', 'NB_TEMPS_PLEIN', 'NB_TEMPS_PARTIEL', 'NB_CADRES', 'NB_NON_CADRES',
+                        'TAUX_FEMINISATION_MANAGEMENT_POURCENT']
                 
                 df_m1 = df_fait[['SIRET', 'DATE_ANALYSE'] + mets].copy()
                 df_m1['DATE_ANALYSE'] = df_m1['DATE_ANALYSE'] + MonthEnd(1)
@@ -241,6 +284,7 @@ if fichiers and date_cible:
                     df_fait[f'EVOL_TURNOVER_{e}_PTS'] = (df_fait['TAUX_TURNOVER_POURCENT'] - df_fait[f'TAUX_TURNOVER_POURCENT{suff}']).round(1)
                     df_fait[f'EVOL_ANCIENNETE_{e}_ABS'] = (df_fait['ANCIENNETE_MOYENNE_CDI_ANNEES'] - df_fait[f'ANCIENNETE_MOYENNE_CDI_ANNEES{suff}']).round(1)
                     df_fait[f'EVOL_FEMINISATION_{e}_PTS'] = (df_fait['TAUX_FEMINISATION_POURCENT'] - df_fait[f'TAUX_FEMINISATION_POURCENT{suff}']).round(1)
+                    df_fait[f'EVOL_FEMINISATION_MANAGEMENT_{e}_PTS'] = (df_fait['TAUX_FEMINISATION_MANAGEMENT_POURCENT'] - df_fait[f'TAUX_FEMINISATION_MANAGEMENT_POURCENT{suff}']).round(1)
                     df_fait[f'EVOL_SANTE_{e}_PTS'] = (df_fait['TAUX_AFFILIES_SANTE_POURCENT'] - df_fait[f'TAUX_AFFILIES_SANTE_POURCENT{suff}']).round(1)
                     df_fait[f'EVOL_PREVOYANCE_{e}_PTS'] = (df_fait['TAUX_AFFILIES_PREV_POURCENT'] - df_fait[f'TAUX_AFFILIES_PREV_POURCENT{suff}']).round(1)
                     df_fait[f'EVOL_CHARGES_PAT_{e}_POURCENT'] = calc_croiss(df_fait['CHARGES_PAT_KE'], df_fait[f'CHARGES_PAT_KE{suff}']).round(1)
@@ -689,7 +733,7 @@ if 'df_indicateurs' in st.session_state and not st.session_state['df_indicateurs
                 med_tot_fmt = f"{med_tot:,} €".replace(',', ' ')
                 row_tot = (
                     '<tr style="background-color:#0B1940;color:white;">'
-                    '<td style="padding:14px 10px;font-weight:bold;border-radius:5px 0 0 5px;">Ensemble</td>'
+                    '<td style="padding:14px 10px;font-weight:bold;border-radius:5px 0 0 5px;">Total</td>'
                     f'<td style="font-weight:900;font-size:1.1em;color:#e91e63;">{eff_tot}</td>'
                     f'<td style="font-weight:bold;color:#e91e63;">{sm_tot_fmt}</td>'
                     f'<td style="color:#ccc;">{med_tot_fmt}</td>'
@@ -837,8 +881,9 @@ if 'df_indicateurs' in st.session_state and not st.session_state['df_indicateurs
                 cout_str = f"{cout_sal_moy:,} €".replace(',', ' ')
                 bottom = generate_evol_block(np.nan, evol_charges_n1, '%', False, hide_m1=True)
                 st.markdown(create_card("COÛT SALARIAL MOYEN", cout_str, "MS chargée / effectif", "#3b82f6", bottom), unsafe_allow_html=True)
+
         # ==========================================
-        # VUE : 📋 ABSENTÉISME (REFONTE MAQUETTE)
+        # VUE : 📋 ABSENTÉISME
         # ==========================================
         elif choix_vue == "📋 Absentéisme":
             # Récupération des données métiers
@@ -915,7 +960,6 @@ if 'df_indicateurs' in st.session_state and not st.session_state['df_indicateurs
                 pct_tot = round((val_j / jours_tot * 100), 1) if jours_tot > 0 else 0.0
                 cout = int(val_j * sal_moyen_jour)
                 
-                # La correction : on formatte les variables AVANT de les mettre dans le HTML
                 cout_fmt = f"{cout:,}".replace(',', ' ')
                 pct_tot_fmt = str(pct_tot).replace('.', ',')
                 tx_partiel_fmt = str(tx_partiel).replace('.', ',')
@@ -981,22 +1025,173 @@ if 'df_indicateurs' in st.session_state and not st.session_state['df_indicateurs
             with c5:
                 badge = format_single_evol(np.nan, ' pts', 'N-1')
                 niv_mal = 2 if tx_mal >= 4.0 else 1 if tx_mal >= 2.5 else 0
-                col_top = "#e91e63" if niv_mal == 2 else ("#ffb020" if niv_mal == 1 else "#e91e63") # Rouge par défaut pour Maladie
+                col_top = "#e91e63" if niv_mal == 2 else ("#ffb020" if niv_mal == 1 else "#e91e63")
                 st.markdown(create_card("ABS. MALADIE", f"{str(tx_mal).replace('.',',')}%", "taux partiel", col_top, f"<div style='margin-top:8px;'>{badge}</div><div style='color:gray; font-size:0.75em; margin-top:8px;'>Secteur : 2,1%</div>"), unsafe_allow_html=True)
                 
             with c6:
                 badge = format_single_evol(np.nan, ' pts', 'N-1')
                 niv_at = 2 if tx_at >= 1.5 else 1 if tx_at >= 0.8 else 0
-                col_top = "#e91e63" if niv_at == 2 else ("#ffb020" if niv_at == 1 else "#ffb020") # Jaune par défaut pour AT
+                col_top = "#e91e63" if niv_at == 2 else ("#ffb020" if niv_at == 1 else "#ffb020")
                 st.markdown(create_card("ABS. ACCIDENT TRAVAIL", f"{str(tx_at).replace('.',',')}%", "taux AT", col_top, f"<div style='margin-top:8px;'>{badge}</div><div style='color:gray; font-size:0.75em; margin-top:8px;'>Secteur : 0,7%</div>"), unsafe_allow_html=True)
                 
             with c7:
-                badge = format_single_evol(0, '', 'N-1') # Fictif "Stable" d'après maquette
+                badge = format_single_evol(0, '', 'N-1')
                 st.markdown(create_card("ABS. CONGÉS LÉGAUX", f"{str(tx_cng).replace('.',',')}%", "maternité + paternité", "#8a2be2", f"<div style='margin-top:8px;'>{badge}</div><div style='color:gray; font-size:0.75em; margin-top:8px;'>Taux normal</div>"), unsafe_allow_html=True)
+
+        # ==========================================
+        # VUE : ⚖️ ÉGALITÉ PRO
+        # ==========================================
+        elif choix_vue == "⚖️ Égalité pro.":
+            st.markdown("<p style='color:#a0aabf; font-weight:bold; letter-spacing:1px; margin-bottom:10px;'>| ÉGALITÉ PROFESSIONNELLE — INDEX L.1142-8 ET INDICATEURS DSN</p>", unsafe_allow_html=True)
+            
+            # --- LIGNE 1 : CARTES SYNTHÈSE ---
+            c1, c2, c3, c4 = st.columns(4)
+            
+            with c1:
+                # Carte 1 : Index DARES (Non géré actuellement)
+                badge_na = "<span style='background-color:#fff3cd; color:#ffb020; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:0.75em;'>⚠ Seuil 85 non atteint</span>"
+                st.markdown(create_card("INDEX ÉGALITÉ PRO.", "N/A <span style='font-size:0.5em; color:gray;'>/100</span>", "Calcul DARES 5 indicateurs", "#0B1940", badge_na), unsafe_allow_html=True)
+
+            with c2:
+                # Carte 2 : Écart salarial
+                ecart_hf = data.get('ECART_SALARIAL_HF_POURCENT', 0.0)
+                coul_ecart = "#ffb020" if abs(ecart_hf) > 5 else "#00b289"
+                bg_ecart = "#fff3cd" if abs(ecart_hf) > 5 else "#e2f9f1"
+                txt_badge_ecart = "À surveiller" if abs(ecart_hf) > 5 else "Conforme"
+                bottom_ecart = f"<span style='background-color:{bg_ecart}; color:{coul_ecart}; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:0.75em;'>Seuil recommandé &lt;5% · {txt_badge_ecart}</span>"
+                st.markdown(create_card("ÉCART SALARIAL H/F", f"{str(ecart_hf).replace('.',',')}%", "(H-F)/H à catég. équiv.", coul_ecart, bottom_ecart), unsafe_allow_html=True)
+
+            with c3:
+                # Carte 3 : Écart d'augmentations
+                ecart_augm = data.get('ECART_AUGMENTATION_HF_PTS', 0.0)
+                signe = "+" if ecart_augm > 0 else ""
+                txt_augm = "Favorable H" if ecart_augm > 0 else ("Favorable F" if ecart_augm < 0 else "Parfaitement neutre")
+                col_augm_badge = "#e91e63" if ecart_augm < 0 else ("#3b82f6" if ecart_augm > 0 else "#00b289")
+                bg_augm_badge = "#fce4ec" if ecart_augm < 0 else ("#e0f2fe" if ecart_augm > 0 else "#e2f9f1")
+                bottom_augm = f"<span style='background-color:{bg_augm_badge}; color:{col_augm_badge}; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:0.75em;'>{txt_augm}</span>"
+                st.markdown(create_card("ÉCART AUGMENTATIONS", f"{signe}{str(ecart_augm).replace('.',',')}%", "hommes vs femmes", "#0B1940", bottom_augm), unsafe_allow_html=True)
+
+            with c4:
+                # Carte 4 : Féminisation Management
+                tx_fem_man = data.get('TAUX_FEMINISATION_MANAGEMENT_POURCENT', 0.0)
+                nb_fem_cadres = int(data.get('NB_FEMMES_CADRES', 0))
+                nb_cadres = int(data.get('NB_CADRES', 0))
+                evol_fem_man = data.get('EVOL_FEMINISATION_MANAGEMENT_N_1_PTS', np.nan)
+                bottom_fem = format_single_evol(evol_fem_man, ' pts', 'N-1')
+                st.markdown(create_card("FÉMINISATION MANAGEMENT", f"{str(tx_fem_man).replace('.',',')}%", f"{nb_fem_cadres}/{nb_cadres} cadres = femmes", "#00b289", bottom_fem), unsafe_allow_html=True)
+
+            # --- LIGNE 2 : TABLEAUX ET BARRES ---
+            col_tab, col_bar = st.columns(2)
+
+            with col_tab:
+                badge_tab = "<span style='background-color:#fce4ec; color:#e91e63; padding:4px 10px; border-radius:15px; font-size:0.7em; font-weight:bold; letter-spacing:0.5px;'>AGRÉGATS ≥3 INDIVIDUS</span>"
+                
+                # Récupération données du tableau
+                sal_c_h = f"{int(data.get('SALAIRE_MOYEN_CADRE_HOMME', 0)):,} €".replace(',', ' ')
+                sal_c_f = f"{int(data.get('SALAIRE_MOYEN_CADRE_FEMME', 0)):,} €".replace(',', ' ')
+                ecart_c = data.get('ECART_SALARIAL_CADRES_HF_POURCENT', 0.0)
+                
+                sal_nc_h = f"{int(data.get('SALAIRE_MOYEN_NON_CADRE_HOMME', 0)):,} €".replace(',', ' ')
+                sal_nc_f = f"{int(data.get('SALAIRE_MOYEN_NON_CADRE_FEMME', 0)):,} €".replace(',', ' ')
+                ecart_nc = data.get('ECART_SALARIAL_NON_CADRES_HF_POURCENT', 0.0)
+                
+                sal_tot_h = f"{int(data.get('SALAIRE_MOYEN_HOMME', 0)):,} €".replace(',', ' ')
+                sal_tot_f = f"{int(data.get('SALAIRE_MOYEN_FEMME', 0)):,} €".replace(',', ' ')
+                ecart_tot = data.get('ECART_SALARIAL_HF_POURCENT', 0.0)
+
+                def style_ecart(val, is_dark_bg=False):
+                    if is_dark_bg:
+                        coul = "#e91e63"
+                        bg = "#2a1525"
+                    else:
+                        coul = "#ffb020"
+                        bg = "#fff3cd"
+                    signe = "+" if val > 0 else ""
+                    return f"<span style='background-color:{bg}; color:{coul}; padding:4px 10px; border-radius:6px; font-weight:900; font-size:0.85em;'>{signe}{str(val).replace('.',',')}%</span>"
+
+                # /!\ Le texte HTML ci-dessous est volontairement collé à gauche
+                html_tab_egalite = f"""<div style="background-color:white; border:1px solid #e0e0e0; border-radius:8px; padding:25px; min-height:320px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h4 style="margin:0; color:#0B1940; font-weight:900;">Salaires H/F par catégorie</h4>{badge_tab}
+    </div>
+    <table style="width:100%; border-collapse:collapse; font-size:0.95em; text-align:center;">
+        <tr style="color:#a0aabf; text-transform:uppercase; font-size:0.75em; border-bottom:2px solid #e91e63;">
+            <th style="padding-bottom:12px; text-align:left; letter-spacing:1px;">Catégorie</th>
+            <th style="padding-bottom:12px; letter-spacing:1px;">Hommes</th>
+            <th style="padding-bottom:12px; letter-spacing:1px;">Femmes</th>
+            <th style="padding-bottom:12px; letter-spacing:1px;">Écart %</th>
+        </tr>
+        <tr style="border-bottom:1px solid #f0f2f6;">
+            <td style="padding:16px 10px; text-align:left; font-weight:900; color:#0B1940;">Cadres</td>
+            <td style="font-weight:bold; color:#0B1940;">{sal_c_h}</td>
+            <td style="font-weight:bold; color:#0B1940;">{sal_c_f}</td>
+            <td>{style_ecart(ecart_c, False)}</td>
+        </tr>
+        <tr style="background-color:#f4f5f8;">
+            <td style="padding:16px 10px; text-align:left; font-weight:900; color:#0B1940;">Non-cadres</td>
+            <td style="font-weight:bold; color:#0B1940;">{sal_nc_h}</td>
+            <td style="font-weight:bold; color:#0B1940;">{sal_nc_f}</td>
+            <td>{style_ecart(ecart_nc, False)}</td>
+        </tr>
+        <tr style="background-color:#0B1940;">
+            <td style="padding:16px 10px; text-align:left; font-weight:900; color:white;">Ensemble</td>
+            <td style="font-weight:900; color:#3b82f6; font-size:1.05em;">{sal_tot_h}</td>
+            <td style="font-weight:900; color:#8a2be2; font-size:1.05em;">{sal_tot_f}</td>
+            <td>{style_ecart(ecart_tot, True)}</td>
+        </tr>
+    </table>
+    <div style="margin-top:15px; font-size:0.7em; color:#a0aabf; display:flex; align-items:center;">
+        🔒 Données agrégées uniquement — groupes ≥ 3 individus · S21.G00.30 + S21.G00.51
+    </div>
+</div>"""
+                st.markdown(html_tab_egalite, unsafe_allow_html=True)
+
+            with col_bar:
+                badge_dsn = "<span style='background-color:#fce4ec; color:#e91e63; padding:4px 10px; border-radius:15px; font-size:0.7em; font-weight:bold; letter-spacing:0.5px;'>S21.G00.30</span>"
+                
+                # Data Effectif Global
+                nb_h_tot = int(data.get('NB_HOMMES', 0))
+                nb_f_tot = int(data.get('NB_FEMMES', 0))
+                eff_tot = nb_h_tot + nb_f_tot
+                pct_h_tot = round(nb_h_tot / eff_tot * 100, 1) if eff_tot > 0 else 0
+                pct_f_tot = round(nb_f_tot / eff_tot * 100, 1) if eff_tot > 0 else 0
+
+                # Data Cadres
+                nb_h_c = int(data.get('NB_HOMMES_CADRES', 0))
+                nb_f_c = int(data.get('NB_FEMMES_CADRES', 0))
+                eff_c = nb_h_c + nb_f_c
+                pct_h_c = round(nb_h_c / eff_c * 100, 1) if eff_c > 0 else 0
+                pct_f_c = round(nb_f_c / eff_c * 100, 1) if eff_c > 0 else 0
+
+                def _bar_egalite(label, nb, pct, color):
+                    return f"""<div style="display:flex; align-items:center; margin-bottom:12px;">
+    <div style="width:80px; font-size:0.95em; font-weight:900; color:#0B1940;">{label}</div>
+    <div style="flex-grow:1; background-color:#eef0f4; height:10px; border-radius:5px; margin:0 20px;">
+        <div style="width:{pct}%; background-color:{color}; height:100%; border-radius:5px;"></div>
+    </div>
+    <div style="width:30px; text-align:right; font-weight:900; color:{color}; font-size:1.05em;">{nb}</div>
+    <div style="width:50px; text-align:right; font-size:0.8em; color:#a0aabf;">{str(pct).replace('.',',')}%</div>
+</div>"""
+
+                html_bar_egalite = f"""<div style="background-color:white; border:1px solid #e0e0e0; border-radius:8px; padding:25px; min-height:320px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h4 style="margin:0; color:#0B1940; font-weight:900;">Répartition H/F</h4>{badge_dsn}
+    </div>
+    <div style="color:#a0aabf; font-size:0.75em; text-transform:uppercase; font-weight:bold; letter-spacing:1px; margin-bottom:12px;">EFFECTIF GLOBAL</div>
+    {_bar_egalite("Hommes", nb_h_tot, pct_h_tot, "#3b82f6")}
+    {_bar_egalite("Femmes", nb_f_tot, pct_f_tot, "#8a2be2")}
+    <hr style="border:none; border-top:1px solid #f0f2f6; margin: 25px 0;">
+    <div style="color:#a0aabf; font-size:0.75em; text-transform:uppercase; font-weight:bold; letter-spacing:1px; margin-bottom:12px;">CADRES</div>
+    {_bar_egalite("Hommes", nb_h_c, pct_h_c, "#3b82f6")}
+    {_bar_egalite("Femmes", nb_f_c, pct_f_c, "#8a2be2")}
+</div>"""
+                st.markdown(html_bar_egalite, unsafe_allow_html=True)
+
+            
         # ==========================================
         # VUES GÉRÉES PAR ÉQUIPE EXTERNE
         # ==========================================
-        elif choix_vue in ["🔄 Turnover", "⚖️ Égalité pro."]:
+        elif choix_vue in ["🔄 Turnover"]:
             st.title(f"{choix_vue} (Géré par équipe externe)")
 
         # ==========================================

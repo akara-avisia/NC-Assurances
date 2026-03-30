@@ -12,7 +12,8 @@ import numpy as np
 # ==========================================
 # 1. CACHE ET API INSEE
 # ==========================================
-BASE_DIR = Path(r"C:\Users\Azad\Documents\NC Assurances")
+# Chemin dynamique : fonctionne sur n'importe quel ordinateur
+BASE_DIR = Path(__file__).parent
 DOSSIER_NVX = BASE_DIR / "NVX_fichier_evol"
 FICHIER_CONCAT = BASE_DIR / "concatenation_DSN.edi"
 
@@ -90,6 +91,7 @@ def parser_fichier_dsn(file_path, date_analyse, siret_attendu):
     contrat_en_cours, absence_en_cours = {}, {}
     current_siret, current_siren_lecture = None, None
     statut_cadre, nature_contrat, temps_travail, sexe, date_naiss, type_rem = None, None, None, None, None, None
+    nir = None
     
     sante_found, prev_found = False, False
     
@@ -99,7 +101,8 @@ def parser_fichier_dsn(file_path, date_analyse, siret_attendu):
     nb_cdi, nb_cdd, nb_alt, nb_stag = 0, 0, 0, 0
     nb_affilies_sante, nb_affilies_prev = 0, 0
     
-    nb_femmes_cadres = 0 
+    nb_femmes_cadres, nb_hommes_cadres = 0, 0 
+    nb_femmes_non_cadres, nb_hommes_non_cadres = 0, 0
     noms_mutuelles, noms_prevoyances = set(), set() 
     
     jours_absence, j_maladie, j_at, j_conges = 0, 0, 0, 0
@@ -126,10 +129,9 @@ def parser_fichier_dsn(file_path, date_analyse, siret_attendu):
                 if current_ref_contrat: adhesions_globales[val] = current_ref_contrat
                 current_ref_contrat = None
 
-            # --- CORRECTION SEXE ---
             elif seg == 'S21.G00.30.001': 
                 nir = val.strip()
-                if nir: sexe = nir[0] # Le 1er chiffre donne le sexe (1=H, 2=F)
+                if nir: sexe = nir[0] 
             elif seg == 'S21.G00.30.006': date_naiss = convertir_date_dsn(val)
 
             elif seg == 'S21.G00.40.019': current_siret = val
@@ -140,8 +142,12 @@ def parser_fichier_dsn(file_path, date_analyse, siret_attendu):
                         effectif += 1
                         if statut_cadre == '01': 
                             nb_cadres += 1
-                            if sexe == '2': nb_femmes_cadres += 1
-                        elif statut_cadre == '04': nb_non_cadres += 1
+                            if sexe == '1': nb_hommes_cadres += 1
+                            elif sexe == '2': nb_femmes_cadres += 1
+                        elif statut_cadre == '04': 
+                            nb_non_cadres += 1
+                            if sexe == '1': nb_hommes_non_cadres += 1
+                            elif sexe == '2': nb_femmes_non_cadres += 1
                         
                         if sexe == '1': nb_h += 1
                         elif sexe == '2': nb_f += 1
@@ -159,7 +165,7 @@ def parser_fichier_dsn(file_path, date_analyse, siret_attendu):
                         elif nature_contrat in ('07','08','09'): nb_alt += 1
                         elif nature_contrat == '29': nb_stag += 1
                 
-                contrat_en_cours = {'SIRET': siret_attendu, 'debut': convertir_date_dsn(val), 'fin': None, 'statut': None, 'sexe': sexe, 'date_naissance': date_naiss}
+                contrat_en_cours = {'SIRET': siret_attendu, 'debut': convertir_date_dsn(val), 'fin': None, 'statut': None, 'sexe': sexe, 'date_naissance': date_naiss, 'NIR': nir}
                 statut_cadre, nature_contrat, temps_travail = None, None, None
                 sante_found, prev_found = False, False
                 affiliations_salarie.clear()
@@ -170,10 +176,9 @@ def parser_fichier_dsn(file_path, date_analyse, siret_attendu):
                 if contrat_en_cours: contrat_en_cours['statut'] = val
             elif seg == 'S21.G00.40.007': nature_contrat = val
             
-            # --- CORRECTION TEMPS DE TRAVAIL ---
             elif seg == 'S21.G00.40.014': 
-                if val.startswith('1'): temps_travail = '1' # ex: 10 = temps plein
-                elif val.startswith('2'): temps_travail = '2' # ex: 20 = partiel
+                if val.startswith('1'): temps_travail = '1' 
+                elif val.startswith('2'): temps_travail = '2' 
                 
             elif seg in ('S21.G00.40.010', 'S21.G00.62.001'):
                 fin_c = convertir_date_dsn(val)
@@ -190,7 +195,7 @@ def parser_fichier_dsn(file_path, date_analyse, siret_attendu):
                     try:
                         montant = float(val)
                         if type_rem == '010':
-                            salaires_hist.append({'SIRET': siret_attendu, 'ANNEE_MOIS': date_analyse, 'MONTANT_BRUT': montant, 'STATUT': statut_cadre, 'SEXE': sexe})
+                            salaires_hist.append({'SIRET': siret_attendu, 'ANNEE_MOIS': date_analyse, 'MONTANT_BRUT': montant, 'STATUT': statut_cadre, 'SEXE': sexe, 'NIR': nir})
                             ms_totale += montant
                             if statut_cadre == '01': ms_cadre += montant
                             elif statut_cadre == '04': ms_non_cadre += montant
@@ -251,14 +256,19 @@ def parser_fichier_dsn(file_path, date_analyse, siret_attendu):
                 try: charges_pat += float(val)
                 except ValueError: pass
 
+        # Fin du fichier, vérifier le dernier contrat en cours
         if contrat_en_cours and current_siret == siret_attendu:
             contrats_hist.append(contrat_en_cours)
             if est_actif(contrat_en_cours, date_analyse):
                 effectif += 1
                 if statut_cadre == '01': 
                     nb_cadres += 1
-                    if sexe == '2': nb_femmes_cadres += 1
-                elif statut_cadre == '04': nb_non_cadres += 1
+                    if sexe == '1': nb_hommes_cadres += 1
+                    elif sexe == '2': nb_femmes_cadres += 1
+                elif statut_cadre == '04': 
+                    nb_non_cadres += 1
+                    if sexe == '1': nb_hommes_non_cadres += 1
+                    elif sexe == '2': nb_femmes_non_cadres += 1
                 
                 if sexe == '1': nb_h += 1
                 elif sexe == '2': nb_f += 1
@@ -278,7 +288,8 @@ def parser_fichier_dsn(file_path, date_analyse, siret_attendu):
         'NOMBRE_CONTRATS_ACTIFS': effectif,
         'NB_HOMMES': nb_h, 'NB_FEMMES': nb_f,
         'NB_CADRES': nb_cadres, 'NB_NON_CADRES': nb_non_cadres,
-        'NB_FEMMES_CADRES': nb_femmes_cadres,
+        'NB_HOMMES_CADRES': nb_hommes_cadres, 'NB_FEMMES_CADRES': nb_femmes_cadres,
+        'NB_HOMMES_NON_CADRES': nb_hommes_non_cadres, 'NB_FEMMES_NON_CADRES': nb_femmes_non_cadres,
         'NB_CDI': nb_cdi, 'NB_CDD': nb_cdd, 'NB_ALTERNANTS': nb_alt, 'NB_STAGIAIRES': nb_stag,
         'NB_TEMPS_PLEIN': nb_tp_plein, 'NB_TEMPS_PARTIEL': nb_tp_partiel,
         'NB_AFFILIES_SANTE': nb_affilies_sante, 'NB_AFFILIES_PREVOYANCE': nb_affilies_prev,
@@ -345,6 +356,7 @@ if not df.empty:
     df['TAUX_NON_CADRES_POURCENT'] = np.round((df['NB_NON_CADRES'] / eff) * 100, 1)
     df['TAUX_TEMPS_PARTIEL_POURCENT'] = np.round((df['NB_TEMPS_PARTIEL'] / eff) * 100, 1)
     
+    # Féminisation du management
     df['TAUX_FEMINISATION_MANAGEMENT_POURCENT'] = np.round(np.where(df['NB_CADRES'] > 0, (df['NB_FEMMES_CADRES'] / df['NB_CADRES']) * 100, 0), 1)
     
     df['MS_CHARGEE_KE'] = np.round((df['MS_BASE_EUROS_BRUT'] + df['CHARGES_PAT_EUROS']) / 1000).astype(int)
@@ -366,6 +378,7 @@ if not df.empty:
 
         c_s = df_c[df_c['SIRET'] == siret].copy()
         s_s = df_s[(df_s['SIRET'] == siret) & (df_s['ANNEE_MOIS'] == d_cible)]
+        s_s_m12 = df_s[(df_s['SIRET'] == siret) & (df_s['ANNEE_MOIS'] == d_12m)]
 
         # --- Turnover & Recrutements ---
         rec = len(c_s[(c_s['debut'] > d_12m) & (c_s['debut'] <= d_cible)])
@@ -384,15 +397,41 @@ if not df.empty:
         actifs['ANC_CDI'] = (d_cible - actifs['debut']).dt.days / 365.25
         anc_mediane = round(actifs['ANC_CDI'].median(), 1) if not actifs.empty else 0.0
 
-        # --- Salaires moyens ---
+        # --- Salaires moyens (Globaux et par catégorie/sexe) ---
         sal_h  = s_s[s_s['SEXE'] == '1']['MONTANT_BRUT'].mean()
         sal_f  = s_s[s_s['SEXE'] == '2']['MONTANT_BRUT'].mean()
         sal_c  = s_s[s_s['STATUT'] == '01']['MONTANT_BRUT'].mean()
         sal_nc = s_s[s_s['STATUT'] == '04']['MONTANT_BRUT'].mean()
+        
+        sal_c_h = s_s[(s_s['STATUT'] == '01') & (s_s['SEXE'] == '1')]['MONTANT_BRUT'].mean()
+        sal_c_f = s_s[(s_s['STATUT'] == '01') & (s_s['SEXE'] == '2')]['MONTANT_BRUT'].mean()
+        sal_nc_h = s_s[(s_s['STATUT'] == '04') & (s_s['SEXE'] == '1')]['MONTANT_BRUT'].mean()
+        sal_nc_f = s_s[(s_s['STATUT'] == '04') & (s_s['SEXE'] == '2')]['MONTANT_BRUT'].mean()
 
         sal_h = 0 if pd.isna(sal_h) else int(round(sal_h))
         sal_f = 0 if pd.isna(sal_f) else int(round(sal_f))
+        sal_c_h = 0 if pd.isna(sal_c_h) else int(round(sal_c_h))
+        sal_c_f = 0 if pd.isna(sal_c_f) else int(round(sal_c_f))
+        sal_nc_h = 0 if pd.isna(sal_nc_h) else int(round(sal_nc_h))
+        sal_nc_f = 0 if pd.isna(sal_nc_f) else int(round(sal_nc_f))
+
         ecart_hf = round(((sal_h - sal_f) / sal_h) * 100, 1) if sal_h > 0 else 0.0
+        ecart_c_hf = round(((sal_c_h - sal_c_f) / sal_c_h) * 100, 1) if sal_c_h > 0 else 0.0
+        ecart_nc_hf = round(((sal_nc_h - sal_nc_f) / sal_nc_h) * 100, 1) if sal_nc_h > 0 else 0.0
+
+        # --- Écart des augmentations individuelles sur 12 mois glissants ---
+        tx_augm_h, tx_augm_f, ecart_augm_pts = 0.0, 0.0, 0.0
+        if not s_s.empty and not s_s_m12.empty and 'NIR' in s_s.columns:
+            s_s_g = s_s.groupby(['NIR', 'SEXE'])['MONTANT_BRUT'].sum().reset_index()
+            s_s_m12_g = s_s_m12.groupby(['NIR', 'SEXE'])['MONTANT_BRUT'].sum().reset_index()
+            merged_s = s_s_g.merge(s_s_m12_g, on=['NIR', 'SEXE'], suffixes=('_N', '_N1'))
+            if not merged_s.empty:
+                merged_s['AUGMENTE'] = merged_s['MONTANT_BRUT_N'] > (merged_s['MONTANT_BRUT_N1'] * 1.01)
+                h_augm_rate = merged_s[merged_s['SEXE'] == '1']['AUGMENTE'].mean() * 100
+                f_augm_rate = merged_s[merged_s['SEXE'] == '2']['AUGMENTE'].mean() * 100
+                tx_augm_h = 0.0 if pd.isna(h_augm_rate) else round(h_augm_rate, 1)
+                tx_augm_f = 0.0 if pd.isna(f_augm_rate) else round(f_augm_rate, 1)
+                ecart_augm_pts = round(tx_augm_h - tx_augm_f, 1)
 
         # --- Salaires médians ---
         sal_med_c   = s_s[s_s['STATUT'] == '01']['MONTANT_BRUT'].median()
@@ -415,13 +454,22 @@ if not df.empty:
             'TAUX_TURNOVER_POURCENT': to,
             'EFFECTIF_MOYEN': eff_moy,
             'ANCIENNETE_MEDIANE_CDI_ANNEES': anc_mediane,
-            # Moyens
+            
+            # Nouvelles variables pour l'égalité Pro
+            'SALAIRE_MOYEN_CADRE_HOMME': sal_c_h,
+            'SALAIRE_MOYEN_CADRE_FEMME': sal_c_f,
+            'ECART_SALARIAL_CADRES_HF_POURCENT': ecart_c_hf,
+            'SALAIRE_MOYEN_NON_CADRE_HOMME': sal_nc_h,
+            'SALAIRE_MOYEN_NON_CADRE_FEMME': sal_nc_f,
+            'ECART_SALARIAL_NON_CADRES_HF_POURCENT': ecart_nc_hf,
+            'ECART_AUGMENTATION_HF_PTS': ecart_augm_pts,
+            
+            # Moyens et Médians globaux
             'SALAIRE_MOYEN_HOMME':     sal_h,
             'SALAIRE_MOYEN_FEMME':     sal_f,
             'ECART_SALARIAL_HF_POURCENT': ecart_hf,
             'SALAIRE_MOYEN_CADRE':     0 if pd.isna(sal_c)  else int(round(sal_c)),
             'SALAIRE_MOYEN_NON_CADRE': 0 if pd.isna(sal_nc) else int(round(sal_nc)),
-            # Médians
             'SALAIRE_MEDIAN_CADRE':     0 if pd.isna(sal_med_c)   else int(round(sal_med_c)),
             'SALAIRE_MEDIAN_NON_CADRE': 0 if pd.isna(sal_med_nc)  else int(round(sal_med_nc)),
             'SALAIRE_MEDIAN_HOMME':     0 if pd.isna(sal_med_h)   else int(round(sal_med_h)),
@@ -451,6 +499,7 @@ if not df.empty:
         'TAUX_ABSENTEISME_POURCENT', 'RECRUTEMENTS_12_MOIS', 'TAUX_TURNOVER_POURCENT',
         'TOTAL_SANTE_EUROS', 'TOTAL_PREVOYANCE_EUROS', 'TOTAL_RETRAITE_EUROS',
         'SALAIRE_MEDIAN_CADRE', 'SALAIRE_MEDIAN_NON_CADRE', 'SALAIRE_MEDIAN_TOTAL',
+        'TAUX_FEMINISATION_MANAGEMENT_POURCENT'
     ]
     
     df_m1 = df[['SIRET', 'DATE_ANALYSE'] + mets].copy()
@@ -470,12 +519,15 @@ if not df.empty:
         df[f'EVOL_SALAIRE_MOYEN_{e}_POURCENT'] = np.round(np.where(df[f'SALAIRE_MOYEN_TOTAL{suf}'] > 0, ((df['SALAIRE_MOYEN_TOTAL'] - df[f'SALAIRE_MOYEN_TOTAL{suf}']) / df[f'SALAIRE_MOYEN_TOTAL{suf}']) * 100, 0), 1)
         df[f'EVOL_ABSENTEISME_{e}_PTS'] = np.round(df['TAUX_ABSENTEISME_POURCENT'] - df[f'TAUX_ABSENTEISME_POURCENT{suf}'], 1)
         df[f'EVOL_TURNOVER_{e}_PTS'] = np.round(df['TAUX_TURNOVER_POURCENT'] - df[f'TAUX_TURNOVER_POURCENT{suf}'], 1)
+        df[f'EVOL_FEMINISATION_MANAGEMENT_{e}_PTS'] = np.round(df['TAUX_FEMINISATION_MANAGEMENT_POURCENT'] - df[f'TAUX_FEMINISATION_MANAGEMENT_POURCENT{suf}'], 1)
 
     df = df.drop(columns=[f"{m}_M1" for m in mets] + [f"{m}_N1" for m in mets])
     df['DATE_ANALYSE'] = df['DATE_ANALYSE'].dt.strftime('%Y-%m-%d')
     
-    df = df.drop(columns=['MS_BASE_EUROS_BRUT', 'MS_PRIMES_EUROS', 'CHARGES_PAT_EUROS', 'NB_FEMMES_CADRES'])
+    # Nettoyage des colonnes intermédiaires (on garde volontairement NB_FEMMES_CADRES, etc.)
+    df = df.drop(columns=['MS_BASE_EUROS_BRUT', 'MS_PRIMES_EUROS', 'CHARGES_PAT_EUROS'])
 
     df_dim_entreprise.to_csv('dim_entreprise.csv', index=False)
     df.to_csv('fait_indicateurs_mensuels.csv', index=False)
-    print("\n✅ Terminé ! Fichiers 'dim_entreprise.csv' et 'fait_indicateurs.csv' générés. Prêt pour Streamlit.")
+    
+    print("✅ Terminé ! Fichiers générés. Prêt pour Streamlit.")
